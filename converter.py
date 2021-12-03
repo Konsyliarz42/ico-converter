@@ -1,4 +1,5 @@
 import textwrap
+import sys
 from pathlib import Path
 from argparse import ArgumentParser
 from enum import Enum
@@ -17,21 +18,10 @@ class ImageFormat(Enum):
 
 
 def open_file(file: Path) -> tuple[Image.Image, str]:
-    """Open file who you want to convert.
 
-    Args:
-        file (Path): Path object to open
-
-    Returns:
-        tuple[Image.Image, str]: Tuple with image objects and raw names of files
-    """
-
-    file_name = file.name
-    _file_name = file_name[:file_name.rfind('.')]
-    
     try:
         name = textwrap.shorten(
-            _file_name,
+            file.name,
             width=LENGTH_OF_PRINT_NAME,
             placeholder="...",
             break_long_words=True
@@ -48,32 +38,21 @@ def open_file(file: Path) -> tuple[Image.Image, str]:
     else:
         print(Fore.GREEN + "Success")
 
-    return img, _file_name
+    return img
 
 
 def save_file(img: Image.Image, file_name: str, img_format: ImageFormat) -> None:
-    """Save Images as files.
-
-    Args:
-        img (Image.Image): Image object
-        file_name (str): Name of file/image
-        img_format (ImageFormat): Format to save
-    """
-
-    _format = img_format.value
-
-
 
     try:
         name = textwrap.shorten(
-            file_name[file_name.rfind('//') + 2:],
+            file_name[file_name.rfind('\\') + 1:],
             width=LENGTH_OF_PRINT_NAME,
             placeholder="..."
         )
         print(name.ljust(LENGTH_OF_PRINT_NAME), end='\t')
         img.save(
-            f"{file_name}.{_format}",
-            format=_format.upper(),
+            f"{file_name}.{img_format.value}",
+            format=img_format.value.upper(),
             sizes=[img.size]
         )
     except OSError:
@@ -85,30 +64,35 @@ def save_file(img: Image.Image, file_name: str, img_format: ImageFormat) -> None
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--files", "-f", nargs='+', help="Files to converting.", type=Path)
+    parser.add_argument("--files", "-f", nargs='+', help="Files to converting. If --all-from-directory this argument is skiping.", type=Path)
     parser.add_argument("--ico-png", help="Convert .ico to .png file.", action='store_true')
-    parser.add_argument("--all-from", "-a", help="Get all png files from directory. If --ico-png is used get all .ico files.", type=Path)
+    parser.add_argument("--all-from-directory", "-a", help="Get all .png files from directory. If --ico-png is used get all .ico files.", type=Path)
 
     args = parser.parse_args()
 
+    if args.__dict__ == {'files': None, 'ico_png': False, 'all_from_directory': None}:
+        parser.print_help()
+        sys.exit()
+
+    open_img_format, save_img_format = ImageFormat.PNG, ImageFormat.ICO
+    _open_img_format, _save_img_format = f'.{open_img_format.value}', f'.{save_img_format.value}'
+
     if args.ico_png:
-        open_img_format = ImageFormat.ICO
-        save_img_format = ImageFormat.PNG
-    else:
-        open_img_format = ImageFormat.PNG
-        save_img_format = ImageFormat.ICO
+        open_img_format, save_img_format = save_img_format, open_img_format
 
-    if args.all_from:
-        path = args.all_from.glob(f'*.{open_img_format.value}')
-        args.files = [f for f in path if f.is_file()]
+    if args.all_from_directory:
+        args.files = args.all_from_directory.glob(f'*{_open_img_format}')
+        
+    files = [f for f in args.files if f.suffix == _open_img_format]
 
-    print("-"*8, f"Loading .{open_img_format.value} files", "-"*8)
-    images = [open_file(img) for img in args.files]
-    images = [img for img in images if img]
+    if files:
+        print("-"*8, f"Loading {_open_img_format} files", "-"*8)
+        images = [open_file(img) for img in files]
+        print('\n' + "-"*8, f"Converting to {_save_img_format}", "-"*8)
 
-    print('\n' + "-"*8, f"Converting to .{save_img_format.value}", "-"*8)
-    for img, name in images:
-        if args.all_from:
-            name = f"{str(args.all_from)}//{name}"
-            
-        save_file(img, name, save_img_format)
+        for img, file in zip(images, files):
+            if img:
+                name = str(file.with_suffix(_save_img_format))
+                save_file(img, name, save_img_format)
+
+

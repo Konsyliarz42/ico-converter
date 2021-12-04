@@ -51,7 +51,7 @@ def save_file(img: Image.Image, file_name: str, img_format: ImageFormat) -> None
         )
         print(name.ljust(LENGTH_OF_PRINT_NAME), end='\t')
         img.save(
-            f"{file_name}.{img_format.value}",
+            file_name,
             format=img_format.value.upper(),
             sizes=[img.size]
         )
